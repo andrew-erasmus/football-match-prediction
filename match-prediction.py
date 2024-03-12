@@ -33,7 +33,7 @@ def scrape_data(comp, team1, team2):
     df = df.rename(columns={'xG':'xGHome','xG.1':'xGAway'})
     
     # format the dataframe for output
-    output_df = df.drop(['Wk','Day','Date','Time','Venue','Referee','Attendance','Match Report','Notes'],axis=1) # display relevant info - keep all info in df
+    # output_df = df.drop(['Wk','Day','Date','Time','Venue','Referee','Attendance','Match Report','Notes'],axis=1) # display relevant info - keep all info in df
     
     
     name = get_comp_name(url)
@@ -60,6 +60,7 @@ def check_team(team, output_df):
     # add error handling to search the array to see if the team is currently in the league
     found = False
     
+    # Account for differences in file formatting
     if 'United' in team or 'united' in team:
         team = team.rstrip("United").strip()
         team = team +" Utd"
@@ -69,6 +70,7 @@ def check_team(team, output_df):
         home_team = output_df.iloc[i]['Home']
         away_team = output_df.iloc[i]['Away']
         
+        # check if the team played in a certain game
         if (team == home_team) or (team == away_team):
             found = True
             break
@@ -76,10 +78,12 @@ def check_team(team, output_df):
     return found
             
         
+# function that will get the name of the competition selected for formatting purposes
 def get_comp_name(url):
     split_url = url.split('/')
     unformatted_name = split_url[-1].split('-')
     
+    # account for difference in bundesliga name from URL
     name = unformatted_name[0]+" "+unformatted_name[1]
     if name == 'Bundesliga Scores':
         name = 'Bundesliga'
