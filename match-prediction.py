@@ -1,7 +1,7 @@
 import pandas as pd
 from IPython.display import display
-from bs4 import BeautifulSoup
-import requests
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 # Steps: 
 # 1- Web scrape to collect data 
@@ -32,23 +32,25 @@ def scrape_data(comp):
     df = df.rename(columns={'xG':'xGHome','xG.1':'xGAway'})
     output_df = df.drop(['Wk','Day','Date','Time','Venue','Referee','Attendance','Match Report','Notes'],axis=1) # display relevant info - keep all info in df
     pd.set_option('display.max_rows', None)
-    
-    df.to_csv(f"{get_comp_name(url)}.csv", index=False) # format dataframe into a CSV file
+    name = get_comp_name(url)
+    df.to_csv(f"{name}.csv", index=False) # format dataframe into a CSV file
     
     # print(output_df.iloc[0]) # selects a specific row from the data frame, places in a 2D list
     # print(output_df.iloc[0]['Home']) # gets the name of the home team
     data_list = output_df.to_dict(orient='records') # process data into a list of dictionaries
-
-def prediction():
-    # get sorted data frame into an array
+    prediction(name)
     
-    # Choose prediction model to process information - maybe a combination
+def prediction(name):
     
-    # Determine winner and potential score
+    # Read in the CSV with the match data
+    match_data = pd.read_csv(f'{name}.csv')
     
-    # Display information 
-    print("Work in progress")
-    
+    display(match_data)
+        
+def check_team(team):
+    # add error handling to search the array to see if the team is currently in the league
+    print('')
+        
 def get_comp_name(url):
     split_url = url.split('/')
     unformatted_name = split_url[-1].split('-')
