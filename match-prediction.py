@@ -1,4 +1,5 @@
 import pandas as pd
+pd.set_option('display.max_rows', None)
 from IPython.display import display
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -21,7 +22,7 @@ data_source={
     }
 
 # holding place function for the prediction of the score
-def scrape_data(comp):
+def scrape_data(comp, team1, team2):
     
     url = data_source.get(comp) # get the correct URL from the dictionary
     
@@ -30,26 +31,50 @@ def scrape_data(comp):
     df = df[df['Wk'].notna()] # remove Weeks with NaN values
     df = df[df['Score'].notna()] # remove games that have not occured yet
     df = df.rename(columns={'xG':'xGHome','xG.1':'xGAway'})
+    
+    # format the dataframe for output
     output_df = df.drop(['Wk','Day','Date','Time','Venue','Referee','Attendance','Match Report','Notes'],axis=1) # display relevant info - keep all info in df
-    pd.set_option('display.max_rows', None)
+    
+    
     name = get_comp_name(url)
     df.to_csv(f"{name}.csv", index=False) # format dataframe into a CSV file
     
-    # print(output_df.iloc[0]) # selects a specific row from the data frame, places in a 2D list
-    # print(output_df.iloc[0]['Home']) # gets the name of the home team
-    data_list = output_df.to_dict(orient='records') # process data into a list of dictionaries
-    prediction(name)
+    # data_list = output_df.to_dict(orient='records') # process data into a list of dictionaries
+    prediction(name, team1, team2)
     
-def prediction(name):
+def prediction(name, team1, team2):
     
     # Read in the CSV with the match data
     match_data = pd.read_csv(f'{name}.csv')
     
-    display(match_data)
+    found_home = check_team(team1, match_data)
+    found_away = check_team(team2, match_data)
+            
+    if found_home and found_away:
+        print("Teams are valid")
+    else:
+        print("Teams are invalid")
+    
         
-def check_team(team):
+def check_team(team, output_df):
     # add error handling to search the array to see if the team is currently in the league
-    print('')
+    found = False
+    
+    if 'United' in team or 'united' in team:
+        team = team.rstrip("United").strip()
+        team = team +" Utd"
+        
+    for i in range(len(output_df)):
+        # iterate through the dataframe
+        home_team = output_df.iloc[i]['Home']
+        away_team = output_df.iloc[i]['Away']
+        
+        if (team == home_team) or (team == away_team):
+            found = True
+            break
+            
+    return found
+            
         
 def get_comp_name(url):
     split_url = url.split('/')
@@ -63,15 +88,16 @@ def get_comp_name(url):
     
 def main():
     print('---- Welcome to the football match score predictor! ----')
-    
-    # team1 = input('Please enter the home team: ')
-    # team2 = input('Please enter the away team: ')
-    
+       
     competition = input('Please select a competition for the match up: (1-8)\n\n1. Premier League\n2. La Liga\n3. Serie A\n4. Bundesliga\n5. Ligue 1\n6. Primeira Liga\n7. Champions League\n8. Europa League\n--> ')
     choices = ['1', '2', '3', '4', '5', '6', '7', '8']
     while competition not in choices:
         competition = input('Invalid choice, please select again (1-8): ')
-    scrape_data(competition)
+    
+    team1 = input('Please enter the home team: ')
+    team2 = input('Please enter the away team: ')
+    
+    scrape_data(competition, team1, team2)
 
 
 
