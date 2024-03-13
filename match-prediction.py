@@ -57,7 +57,13 @@ def scrape_data(comp, team1, team2):
     
     data = requests.get(f"https://fbref.com{links[0]}") # get data from shootings
     
-    shooting = pd.read_html(data.text, match="Shooting")[0]
+    shooting = pd.read_html(data.text, match="Shooting")[0] # get shooting information
+    
+    shooting.columns = shooting.columns.droplevel() # take away multilevel index - the first header
+    
+    # merge the match and shooting dataframes
+    team_data = matches.merge(shooting[['Date', 'Sh', 'SoT','Dist', 'FK', 'PK','PKAtt']], on='Date')
+    
     # prediction(name, team1, team2)
     
 def prediction(name, team1, team2):
