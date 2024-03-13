@@ -3,4 +3,6 @@ Goal is to make a predictor for a football match that is coming up. Will aim to 
 
 # Requirements
 - Pandas
-- IPython
+- requests
+- BeautifulSoup
+- html5lib
