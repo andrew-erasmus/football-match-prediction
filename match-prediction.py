@@ -29,7 +29,7 @@ def scrape_data(comp, team1, team2):
     url = data_source.get(comp) # get the correct URL from the dictionary
     
     # list the range of years to scrape
-    years = list(range(2024,2020), -1)
+    years = list(range(2024,2020, -1))
     all_matches = []
     
     for year in years:
