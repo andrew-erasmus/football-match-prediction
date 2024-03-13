@@ -1,8 +1,8 @@
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+import time
 pd.set_option('display.max_rows', None)
-from IPython.display import display
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
@@ -28,43 +28,59 @@ def scrape_data(comp, team1, team2):
     
     url = data_source.get(comp) # get the correct URL from the dictionary
     
-    # extract information for the matches using requests library
-    data = requests.get(url)
-    soup  = BeautifulSoup(data.text)
+    # list the range of years to scrape
+    years = list(range(2024,2020), -1)
+    all_matches = []
     
-    # get the table of standings with all team information
-    standings = soup.select('table.stats_table')[0]
+    for year in years:
+        # extract information for the matches using requests library
+        data = requests.get(url)
+        soup  = BeautifulSoup(data.text)
+        
+        # get the table of standings with all team information
+        standings = soup.select('table.stats_table')[0]
+        links = [l.get('href') for l in links]
+        links =  [l for l in links if '/squads/' in l] # if squads is not in the link - get rid of it
+        
+        team_urls = [f"https://fbref.com{l}" for l in links] # formats the string to have absolute links from relative links
+        
+        previous_season = soup.select('a.prev')[0].get('href') # select the tags with class prev
+        url = f'https://fbref.com/{previous_season}' # ensures can scrape from multiple seasons
+        
+        # scrape the match logs for each team
+        for team_url in team_urls:
+            team_name = team_url.split('/')[-1].replace('-Stats', '').replace('-',' ') # get the team name
+            data = requests.get(team_url) # get data from matches table
+            matches = pd.read_html(data.text, match="Scores & Fixtures")[0]
+            
+            soup=BeautifulSoup(data.text)
+            links = [l.get('href') for l in links] # get the url for the shooting stats
+            links = [l for l in links if l and 'all_comps/shooting/' in l] # get the shooting link
+            data = requests.get(f"https://fbref.com{links[0]}") # get data from absolute URL
+            shooting = pd.read_html(data.text, match="Shooting")[0] # get shooting information
+            
+            shooting.columns = shooting.columns.droplevel() # take away top index level
+            
+            try:
+                # merge the match and shooting dataframes
+                team_data = matches.merge(shooting[['Date', 'Sh', 'SoT','Dist', 'FK', 'PK','PKAtt']], on='Date')
+            except ValueError:
+                continue # if there are no shooting stats, ignore that team's merge
+            
+            team_data = team_data[team_data['Comp'] == get_comp_name(url)]
+            team_data['Season'] = year
+            team_data['Team'] = team_name
+            all_matches.append(team_data) # add team data frame to list
+            time.sleep('1') # ensure scraping does not occur too quickly - to not get blocked
+        
+        
+            
+    match_df = pd.concat(all_matches)
+    match_df.columns = [c.lower() for c in match_df.columns] # puts the column names to be lower case
+    match_df.to_csv(f'{get_comp_name(url)}.csv')
+                
+            
     
-    # find the anchor for all team stats
-    links = standings.find_all('a')
-    
-    links = [l.get('href') for l in links]
-    links =  [l for l in links if '/squads/' in l] # if squads is not in the link - get rid of it
-    
-    team_urls = [f"https://fbref.com{l}" for l in links] # formats the string to have absolute links
-    
-    # get team match information
-    team_url = team_urls[0]
-    data = requests.get(team_url) # get the data for the matches for 1 team
-    
-    matches = pd.read_html(data.text, match="Scores & Fixtures")
-    
-    # get information about shooting   
-    soup = BeautifulSoup(data.text)
-    links = soup.find_all('a') # find all links
-    links = [l.get('href') for l in links] # get the actual url
-    links = [l for l in links if l and 'all_comps/shooting/' in l] # get the shooting link
-    
-    data = requests.get(f"https://fbref.com{links[0]}") # get data from shootings
-    
-    shooting = pd.read_html(data.text, match="Shooting")[0] # get shooting information
-    
-    shooting.columns = shooting.columns.droplevel() # take away multilevel index - the first header
-    
-    # merge the match and shooting dataframes
-    team_data = matches.merge(shooting[['Date', 'Sh', 'SoT','Dist', 'FK', 'PK','PKAtt']], on='Date')
-    
-    # prediction(name, team1, team2)
     
 def prediction(name, team1, team2):
     
@@ -106,16 +122,9 @@ def check_team(team, output_df):
     return found
             
         
-# function that will get the name of the competition selected for formatting purposes
+# function that will get the name of the competition selected for formatting purposes https://fbref.com/en/comps/9/Premier-League-Stats
 def get_comp_name(url):
-    split_url = url.split('/')
-    unformatted_name = split_url[-1].split('-')
-    
-    # account for difference in bundesliga name from URL
-    name = unformatted_name[0]+" "+unformatted_name[1]
-    if name == 'Bundesliga Scores':
-        name = 'Bundesliga'
-        
+    name = url.split('/')[-1].replace('-Stats', '').replace('-', ' ')
     return name
     
 def main():
