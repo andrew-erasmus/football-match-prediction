@@ -2,6 +2,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 import time
+from io import StringIO
 pd.set_option('display.max_rows', None)
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -35,11 +36,11 @@ def scrape_data(comp, team1, team2):
     for year in years:
         # extract information for the matches using requests library
         data = requests.get(url)
-        soup  = BeautifulSoup(data.text)
+        soup  = BeautifulSoup(StringIO(data.text))[0] #! Fix this error with the list - list index out of range
         
         # get the table of standings with all team information
-        standings = soup.select('table.stats_table')[0]
-        links = [l.get('href') for l in links]
+        standings = soup.select('table.stats_table')
+        links = [l.get('href') for l in standings.find_all('a')]
         links =  [l for l in links if '/squads/' in l] # if squads is not in the link - get rid of it
         
         team_urls = [f"https://fbref.com{l}" for l in links] # formats the string to have absolute links from relative links
@@ -51,19 +52,19 @@ def scrape_data(comp, team1, team2):
         for team_url in team_urls:
             team_name = team_url.split('/')[-1].replace('-Stats', '').replace('-',' ') # get the team name
             data = requests.get(team_url) # get data from matches table
-            matches = pd.read_html(data.text, match="Scores & Fixtures")[0]
+            matches = pd.read_html(StringIO(data.text), match="Scores & Fixtures")[0]
             
-            soup=BeautifulSoup(data.text)
-            links = [l.get('href') for l in links] # get the url for the shooting stats
+            soup=BeautifulSoup(StringIO(data.text))
+            links = [l.get('href') for l in soup.find_all('a')] # get the url for the shooting stats
             links = [l for l in links if l and 'all_comps/shooting/' in l] # get the shooting link
             data = requests.get(f"https://fbref.com{links[0]}") # get data from absolute URL
-            shooting = pd.read_html(data.text, match="Shooting")[0] # get shooting information
+            shooting = pd.read_html(StringIO(data.text), match="Shooting")[0] # get shooting information
             
             shooting.columns = shooting.columns.droplevel() # take away top index level
             
             try:
                 # merge the match and shooting dataframes
-                team_data = matches.merge(shooting[['Date', 'Sh', 'SoT','Dist', 'FK', 'PK','PKAtt']], on='Date')
+                team_data = matches.merge(shooting[['Date', 'Sh', 'SoT','Dist', 'FK', 'PK']], on='Date')
             except ValueError:
                 continue # if there are no shooting stats, ignore that team's merge
             
@@ -71,7 +72,7 @@ def scrape_data(comp, team1, team2):
             team_data['Season'] = year
             team_data['Team'] = team_name
             all_matches.append(team_data) # add team data frame to list
-            time.sleep('1') # ensure scraping does not occur too quickly - to not get blocked
+            time.sleep(1) # ensure scraping does not occur too quickly - to not get blocked
         
         
             
