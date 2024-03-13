@@ -1,4 +1,6 @@
 import pandas as pd
+import requests
+from bs4 import BeautifulSoup
 pd.set_option('display.max_rows', None)
 from IPython.display import display
 from sklearn.model_selection import train_test_split
@@ -11,14 +13,14 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 # 4- Displaying of information
 
 data_source={
-    '1':'https://fbref.com/en/comps/9/schedule/Premier-League-Scores-and-Fixtures', # premier league fixtures
-    '2':'https://fbref.com/en/comps/12/schedule/La-Liga-Scores-and-Fixtures', # la liga fixtures
-    '3':'https://fbref.com/en/comps/11/schedule/Serie-A-Scores-and-Fixtures', # serie a fixtures
-    '4':'https://fbref.com/en/comps/20/schedule/Bundesliga-Scores-and-Fixtures', # bundesliga fixtures
-    '5':'https://fbref.com/en/comps/13/schedule/Ligue-1-Scores-and-Fixtures', # ligue 1 fixtures
-    '6':'https://fbref.com/en/comps/32/schedule/Primeira-Liga-Scores-and-Fixtures', # primeira liga fixtures
-    '7':'https://fbref.com/en/comps/8/schedule/Champions-League-Scores-and-Fixtures', # champions league fixtures
-    '8':'https://fbref.com/en/comps/19/schedule/Europa-League-Scores-and-Fixtures' # europa league fixtures
+    '1':'https://fbref.com/en/comps/9/Premier-League-Stats', # premier league fixtures
+    '2':'https://fbref.com/en/comps/12/La-Liga-Stats', # la liga fixtures
+    '3':'https://fbref.com/en/comps/11/Serie-A-Stats', # serie a fixtures
+    '4':'https://fbref.com/en/comps/20/Bundesliga-Stats', # bundesliga fixtures
+    '5':'https://fbref.com/en/comps/13/Ligue-1-Stats', # ligue 1 fixtures
+    '6':'https://fbref.com/en/comps/32/Primeira-Liga-Stats', # primeira liga fixtures
+    '7':'https://fbref.com/en/comps/8/Champions-League-Stats', # champions league fixtures
+    '8':'https://fbref.com/en/comps/19/Europa-League-Stats' # europa league fixtures
     }
 
 # holding place function for the prediction of the score
@@ -26,34 +28,54 @@ def scrape_data(comp, team1, team2):
     
     url = data_source.get(comp) # get the correct URL from the dictionary
     
-    # extract information for the matches using Pandas   
-    df = pd.read_html(url,index_col=False)[0]
-    df = df[df['Wk'].notna()] # remove Weeks with NaN values
-    df = df[df['Score'].notna()] # remove games that have not occured yet
-    df = df.rename(columns={'xG':'xGHome','xG.1':'xGAway'})
+    # extract information for the matches using requests library
+    data = requests.get(url)
+    soup  = BeautifulSoup(data.text)
     
-    # format the dataframe for output
-    # output_df = df.drop(['Wk','Day','Date','Time','Venue','Referee','Attendance','Match Report','Notes'],axis=1) # display relevant info - keep all info in df
+    # get the table of standings with all team information
+    standings = soup.select('table.stats_table')[0]
     
+    # find the anchor for all team stats
+    links = standings.find_all('a')
     
-    name = get_comp_name(url)
-    df.to_csv(f"{name}.csv", index=False) # format dataframe into a CSV file
+    links = [l.get('href') for l in links]
+    links =  [l for l in links if '/squads/' in l] # if squads is not in the link - get rid of it
     
-    # data_list = output_df.to_dict(orient='records') # process data into a list of dictionaries
-    prediction(name, team1, team2)
+    team_urls = [f"https://fbref.com{l}" for l in links] # formats the string to have absolute links
+    
+    # get team match information
+    team_url = team_urls[0]
+    data = requests.get(team_url) # get the data for the matches for 1 team
+    
+    matches = pd.read_html(data.text, match="Scores & Fixtures")
+    
+    # get information about shooting   
+    soup = BeautifulSoup(data.text)
+    links = soup.find_all('a') # find all links
+    links = [l.get('href') for l in links] # get the actual url
+    links = [l for l in links if l and 'all_comps/shooting/' in l] # get the shooting link
+    
+    data = requests.get(f"https://fbref.com{links[0]}") # get data from shootings
+    
+    shooting = pd.read_html(data.text, match="Shooting")[0]
+    # prediction(name, team1, team2)
     
 def prediction(name, team1, team2):
     
     # Read in the CSV with the match data
-    match_data = pd.read_csv(f'{name}.csv')
+    match_data = pd.read_csv(f'{name}.csv', index_col=0)
+    print(match_data)
     
-    found_home = check_team(team1, match_data)
-    found_away = check_team(team2, match_data)
+    # Cleaning date data for processing
+    match_data["date"] = pd.to_datetime(match_data["date"])
+    
+    # found_home = check_team(team1, match_data)
+    # found_away = check_team(team2, match_data)
             
-    if found_home and found_away:
-        print("Teams are valid")
-    else:
-        print("Teams are invalid")
+    # if found_home and found_away:
+    #     print("Teams are valid")
+    # else:
+    #     print("Teams are invalid")
     
         
 def check_team(team, output_df):
